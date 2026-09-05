@@ -1,5 +1,6 @@
 export default async function handler(req, res) {
-  // Allow requests from the Chrome extension
+
+  // Allow requests from Teacher AI
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
     "Access-Control-Allow-Methods",
@@ -10,11 +11,12 @@ export default async function handler(req, res) {
     "Content-Type"
   );
 
-  // Handle browser preflight request
+  // Handle browser preflight
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
+  // Only allow POST
   if (req.method !== "POST") {
     return res.status(405).json({
       error: "Method not allowed"
@@ -22,6 +24,7 @@ export default async function handler(req, res) {
   }
 
   try {
+
     const { prompt } = req.body || {};
 
     if (!prompt) {
@@ -31,17 +34,25 @@ export default async function handler(req, res) {
     }
 
     const response = await fetch(
-      "https://api.openai.com/v1/responses",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" +
+      process.env.GEMINI_API_KEY,
       {
         method: "POST",
+
         headers: {
-          "Content-Type": "application/json",
-          "Authorization":
-            `Bearer ${process.env.OPENAI_API_KEY}`
+          "Content-Type": "application/json"
         },
+
         body: JSON.stringify({
-          model: "gpt-5.6-luna",
-          input: prompt
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ]
         })
       }
     );
@@ -50,19 +61,28 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       return res.status(response.status).json({
-        error: data.error?.message || "AI request failed"
+        error:
+          data.error?.message ||
+          "Gemini request failed"
       });
     }
 
+    const output =
+      data.candidates?.[0]?.content?.parts?.[0]?.text;
+
     return res.status(200).json({
-      output: data.output_text
+      output:
+        output ||
+        "No response received from Gemini."
     });
 
   } catch (error) {
+
     console.error(error);
 
     return res.status(500).json({
-      error: "Server error"
+      error: error.message ||
+        "Server error"
     });
   }
 }
