@@ -50,56 +50,16 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error:
-          data.error?.message ||
-          "Gemini request failed"
-      });
-    }
-
-    // Get Gemini's text response
-    let output = "";
-
-    const steps = data.steps || [];
-
-    for (const step of steps) {
-
-      if (
-        step.type === "model_output" &&
-        step.content
-      ) {
-
-        for (const content of step.content) {
-
-          if (
-            content.type === "text" &&
-            content.text
-          ) {
-            output += content.text;
-          }
-
-        }
-      }
-    }
-
-    if (!output) {
-      return res.status(500).json({
-        error: "Gemini responded, but no text was found."
-      });
-    }
-
-    return res.status(200).json({
-      output: output
+    // TEMPORARY DIAGNOSTIC RESPONSE
+    return res.status(response.status).json({
+      gemini_status: response.status,
+      gemini_response: data
     });
 
   } catch (error) {
 
-    console.error(error);
-
     return res.status(500).json({
-      error: error.message ||
-        "Server error"
+      error: error.message
     });
   }
 }
