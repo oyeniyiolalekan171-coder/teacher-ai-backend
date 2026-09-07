@@ -1,5 +1,6 @@
 export default async function handler(req, res) {
 
+  // Allow the Teacher AI frontend to call this API
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
     "Access-Control-Allow-Methods",
@@ -10,10 +11,12 @@ export default async function handler(req, res) {
     "Content-Type"
   );
 
+  // Handle browser preflight request
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
+  // Only POST is allowed
   if (req.method !== "POST") {
     return res.status(405).json({
       error: "Method not allowed"
@@ -49,32 +52,63 @@ export default async function handler(req, res) {
         },
 
         body: JSON.stringify({
+
           model: "gemini-3.1-flash-image",
 
           input: prompt,
 
           response_format: {
             type: "image",
+            mime_type: "image/png",
             aspect_ratio: "4:3",
             image_size: "1K"
           }
+
         })
       }
     );
 
     const data = await response.json();
 
+    // Gemini API returned an error
     if (!response.ok) {
+
+      console.error(
+        "Gemini image error:",
+        data
+      );
+
       return res.status(response.status).json({
         error:
           data.error?.message ||
-          "Image generation failed"
+          "Gemini image generation failed."
       });
     }
 
-    let imageData = null;
-    let mimeType = "image/png";
 
+    // Current Gemini response format
+    if (
+      data.output_image &&
+      data.output_image.data
+    ) {
+
+      const mimeType =
+        data.output_image.mime_type ||
+        "image/png";
+
+      return res.status(200).json({
+
+        image:
+          "data:" +
+          mimeType +
+          ";base64," +
+          data.output_image.data
+
+      });
+    }
+
+
+    // Backup: check the steps array
     if (data.steps) {
 
       for (const step of data.steps) {
@@ -91,48 +125,50 @@ export default async function handler(req, res) {
               item.data
             ) {
 
-              imageData = item.data;
-
-              mimeType =
+              const mimeType =
                 item.mime_type ||
                 "image/png";
 
-              break;
+              return res.status(200).json({
+
+                image:
+                  "data:" +
+                  mimeType +
+                  ";base64," +
+                  item.data
+
+              });
             }
-
           }
-
         }
-
-        if (imageData) break;
       }
     }
 
-    if (!imageData) {
-      return res.status(500).json({
-        error: "Gemini did not return an image."
-      });
-    }
 
-    return res.status(200).json({
+    // No image was found
+    console.error(
+      "Gemini response did not contain an image:",
+      data
+    );
 
-      image:
-        "data:" +
-        mimeType +
-        ";base64," +
-        imageData
-
+    return res.status(500).json({
+      error: "Gemini did not return an image."
     });
+
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "Image server error:",
+      error
+    );
 
     return res.status(500).json({
       error:
         error.message ||
-        "Image server error"
+        "Image server error."
     });
 
   }
-          }
+
+}
