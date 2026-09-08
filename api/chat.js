@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
     "Access-Control-Allow-Methods",
@@ -21,7 +20,6 @@ export default async function handler(req, res) {
   }
 
   try {
-
     const { prompt } = req.body || {};
 
     if (!prompt) {
@@ -30,35 +28,27 @@ export default async function handler(req, res) {
       });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
       return res.status(500).json({
-        error: "GEMINI_API_KEY is missing from Vercel."
+        error: "OPENAI_API_KEY is missing from Vercel."
       });
     }
 
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent",
+      "https://api.openai.com/v1/responses",
       {
         method: "POST",
 
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
+          "Authorization": `Bearer ${apiKey}`
         },
 
         body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: prompt
-                }
-              ]
-            }
-          ]
+          model: "gpt-5.6-luna",
+          input: prompt
         })
       }
     );
@@ -67,20 +57,23 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       return res.status(response.status).json({
-        error: data.error?.message || "Gemini API error"
+        error:
+          data.error?.message ||
+          "OpenAI API error"
       });
     }
 
     const output =
-      data.candidates?.[0]?.content?.parts
-        ?.filter(part => part.text)
-        ?.map(part => part.text)
+      data.output_text ||
+      data.output
+        ?.flatMap(item => item.content || [])
+        ?.filter(item => item.type === "output_text")
+        ?.map(item => item.text)
         ?.join("\n");
 
     if (!output) {
       return res.status(500).json({
-        error: "Gemini returned no text.",
-        details: data
+        error: "OpenAI returned no text."
       });
     }
 
@@ -89,10 +82,12 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
+    console.error("Chat error:", error);
 
     return res.status(500).json({
-      error: error.message || "Server error"
+      error:
+        error.message ||
+        "Server error"
     });
   }
   }
-
